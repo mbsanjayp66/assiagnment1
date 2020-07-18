@@ -1,0 +1,22 @@
+{{> header}}
+<div class="container mt-5">
+  <h1>Logout</h1>
+
+  <div class="row">
+    <div class="col-sm-8">
+      <div class="card">
+        <div class="card-body">
+
+          <!-- Makes POST request to /login route -->
+          <form action="/logout" method="POST">
+            <h1>do you want to logout from the system press this button</h1>
+            <button type="submit" class="btn btn-dark">Logout</button>
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{{> footer}}
