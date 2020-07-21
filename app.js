@@ -24,8 +24,8 @@ AdminBro.registerAdapter(require('admin-bro-mongoose'));
 
 
 app.use(express.static("public"));
-app.use(bodyParser.json());
-//app.use(bodyParser.urlencoded({extended:true}));
+//app.use(bodyParser.json());
+
 //app.use(formidableMiddleware());
 app.engine('handlebars', exphbs());
 app.set('view engine', 'handlebars');
@@ -87,6 +87,30 @@ const User = new mongoose.model("User",userSchema);
 passport.use(User.createStrategy());
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
+// admin
+
+const adminBro = new AdminBro({
+  databases: [mongoose],
+  rootPath: '/admin',
+});
+const ADMIN = {
+  email:"admin@gmail.com",
+  password:"sanjay",
+}
+const router = AdminBroExpress.buildAuthenticatedRouter(adminBro,{
+  authenticate: async (email, password)=>{
+    if(email === ADMIN.email && password === ADMIN.password){
+      return ADMIN
+    }
+    return null
+  },
+  cookieName: 'adminbro',
+  cookiePassword: 'somePassword',
+});
+app.use(adminBro.options.rootPath, router);
+
+app.use(bodyParser.urlencoded({extended:true}));
+
 
 app.post("/register",function(req,res){
   var newUser = new User({
@@ -183,7 +207,8 @@ req.login(user,function(err){
     console.log(err);
   }else{
     passport.authenticate("local")(req,res,function(err,foundUser){
-          res.render("succes",{Time:"3"});
+         var time = new Date();
+          res.render("succes",{Time:time});
     });
   }
 });
@@ -228,27 +253,7 @@ app.post("/logout",function(req,res){
     });
 });
 //
-// admin
 
-const adminBro = new AdminBro({
-  databases: [mongoose],
-  rootPath: '/admin',
-});
-const ADMIN = {
-  email:"admin@gmail.com",
-  password:"sanjay",
-}
-const router = AdminBroExpress.buildAuthenticatedRouter(adminBro,{
-  authenticate: async (email, password)=>{
-    if(email === ADMIN.email && password === ADMIN.password){
-      return ADMIN
-    }
-    return null
-  },
-  cookieName: 'adminbro',
-  cookiePassword: 'somePassword',
-});
-app.use(adminBro.options.rootPath, router);
 
 // forgot password
 
