@@ -1,7 +1,6 @@
-console.log("sanjay assignment");
 require('dotenv').config();
 const express = require('express');
-const formidableMiddleware = require('express-formidable');
+//const formidableMiddleware = require('express-formidable');
 const exphbs  = require('express-handlebars');
 const path = require("path");
 const bodyParser = require("body-parser");
@@ -26,7 +25,7 @@ AdminBro.registerAdapter(require('admin-bro-mongoose'));
 
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({extended:true}));
-app.use(formidableMiddleware());
+//app.use(formidableMiddleware());
 app.engine('handlebars', exphbs());
 app.set('view engine', 'handlebars');
 
@@ -64,22 +63,22 @@ app.get("/logout",function(req,res){
   res.render("logout");
 });
 
-app.all('/express-flash', function( req, res ) {
-    req.flash('success', 'This is a flash message using the express-flash module.');
-    res.redirect(301, '/');
-});
-
 mongoose.connect('mongodb://localhost:27017/registerDB', {useNewUrlParser: true, useUnifiedTopology: true});
 mongoose.set('useCreateIndex', true);
 
 const userSchema = new mongoose.Schema({
+  name:String,
+  phoneNumber:Number,
+  address:String,
+  city:String,
+  pincode:Number,
+  state: String,
+  country:String,
   username:String,
   password:String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
-  },
-  {timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }}
-);
+});
 userSchema.plugin(timestamps);
 userSchema.plugin(passportLocalMongoose);
 const User = new mongoose.model("User",userSchema);
@@ -89,7 +88,18 @@ passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
 app.post("/register",function(req,res){
-  User.register({username:req.body.username},req.body.password,function(err,user){
+  var newUser = new User({
+    name:req.body.fname,
+    phoneNumber:req.body.mobile,
+    address:req.body.address,
+    city:req.body.city,
+    pincode:req.body.pincode,
+    state: req.body.state,
+    country:req.body.country,
+    username:req.body.username,
+    password:req.body.password
+      });
+  User.register(newUser,req.body.password,function(err,user){
       if(err){
         console.log(err);
         res.redirect("/register");
@@ -171,8 +181,8 @@ req.login(user,function(err){
   if(err){
     console.log(err);
   }else{
-    passport.authenticate("local")(req,res,function(){
-      res.render("succes",{Time:user.createdAt});
+    passport.authenticate("local")(req,res,function(err,foundUser){
+          res.render("succes",{Time:"3"});
     });
   }
 });
@@ -223,12 +233,12 @@ const adminBro = new AdminBro({
   databases: [mongoose],
   rootPath: '/admin',
 });
-const router = AdminBroExpress.buildRouter(adminBro);
+ const router = AdminBroExpress.buildRouter(adminBro);
  app.use(adminBro.options.rootPath, router);
-const ADMIN = {
-  email:"admin@gmail.com",
-  password:"sanjay",
-}
+// const ADMIN = {
+//   email:"admin@gmail.com",
+//   password:"sanjay",
+// }
 // const router = AdminBroExpress.buildAuthenticatedRouter(adminBro,{
 //   authenticate: async (email, password)=>{
 //     if(email === ADMIN.email && password === ADMIN.password){
@@ -243,67 +253,65 @@ const ADMIN = {
 
 // forgot password
 
-app.post("/forgot",function(req,res,next){
+app.post('/forgot', function(req, res, next) {
   async.waterfall([
-    function(done){
-      crypto.randomBytes(20,function(err,buf){
-       var token = buf.toString("hex");
-        done(err,token);
+    function(done) {
+      crypto.randomBytes(20, function(err, buf) {
+        var token = buf.toString('hex');
+        done(err, token);
       });
     },
-    function(token,done){
-      User.findOne({username: req.body.username},function(err,user){
-        if(!user){
-          req.flash("error","No account with that email address exist.");
-          return res.redirect("/login");
+    function(token, done) {
+      User.findOne({ username: req.body.username }, function(err, user) {
+        if (!user) {
+          req.flash('error', 'No account with that email address exists.');
+          return res.redirect('/login');
         }
+
         user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now()+3600000;//1 hour;
-        user.save(function(err){
-          done(err,token,user);
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+        user.save(function(err) {
+          done(err, token, user);
         });
       });
     },
-    function(token,user,done){
+    function(token, user, done) {
       var smtpTransport = nodemailer.createTransport({
-        service: "Gmail",
-        auth:{
-          user:"mbsanjayp66@gmail.com",
-          pass:process.env.GMAILPW
+        service: 'Gmail',
+        auth: {
+          user: "mbsanjayp66@gmail.com",
+          pass: process.env.GMAILPW
         }
       });
-
       var mailOptions = {
-        to:user.username,
-        from:"mbsanjayp66@gmail.com",
-        subject:"Node.js Password Reset",
-        text:'You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n' +
+        to: user.username,
+        from: "mbsanjayp66@gmail.com",
+        subject: 'Node.js Password Reset',
+        text: 'You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n' +
           'Please click on the following link, or paste this into your browser to complete the process:\n\n' +
           'http://' + req.headers.host + '/reset/' + token + '\n\n' +
           'If you did not request this, please ignore this email and your password will remain unchanged.\n'
-
       };
-      smtpTransport.sendMail(mailOptions,function(err){
-        console.log("mail sent");
-        req.flash("succes","An email has been sent to"+ user.username +"with further instruction")
-        done(err,"done");
+      smtpTransport.sendMail(mailOptions, function(err) {
+        console.log('mail sent');
+        req.flash('success', 'An e-mail has been sent to ' + user.username + ' with further instructions.');
+        done(err, 'done');
       });
     }
-  ],function(err){
-    if(err){
-      return next(err);
-      res.redirect("/")
-    }
+  ], function(err) {
+    if (err) return next(err);
+    res.redirect('/login');
   });
 });
 
-app.get("/reset/:token",function(req,res){
-  User.findOne({resetPasswordToken:req.params.token,resetPasswordExpires: {$gt:Date.now()}},function(err,user){
-    if(!user){
-      req.flash("error","password reset token is invalid");
-      return res.redirect("/");
+app.get('/reset/:token', function(req, res) {
+  User.findOne({ resetPasswordToken: req.params.token, resetPasswordExpires: { $gt: Date.now() } }, function(err, user) {
+    if (!user) {
+      req.flash('error', 'Password reset token is invalid or has expired.');
+      return res.redirect('/login');
     }
-    res.render("reset",{token:req.params.token});
+    res.render('reset', {token: req.params.token});
   });
 });
 
@@ -336,7 +344,7 @@ app.post('/reset/:token', function(req, res) {
       var smtpTransport = nodemailer.createTransport({
         service: 'Gmail',
         auth: {
-          user: 'mbsanjayp66@gmail.com',
+          user: "mbsanjayp66@gmail.com",
           pass: process.env.GMAILPW
         }
       });
@@ -349,6 +357,7 @@ app.post('/reset/:token', function(req, res) {
       };
       smtpTransport.sendMail(mailOptions, function(err) {
         req.flash('success', 'Success! Your password has been changed.');
+        console.log("password changed");
         done(err);
       });
     }
@@ -356,6 +365,8 @@ app.post('/reset/:token', function(req, res) {
     res.redirect('/');
   });
 });
+
+
 app.listen(3000,function(){
   console.log("running");
 });

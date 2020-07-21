@@ -1,7 +1,6 @@
 {
   "name": "assiagnment1",
   "version": "1.0.0",
-  "description": "",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -31,5 +30,15 @@
     "passport-local-mongoose": "^6.0.1",
     "req-flash": "0.0.3",
     "session": "^0.1.0"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mbsanjayp66/assiagnment1.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mbsanjayp66/assiagnment1/issues"
+  },
+  "homepage": "https://github.com/mbsanjayp66/assiagnment1#readme",
+  "description": ""
 }
