@@ -24,7 +24,8 @@ AdminBro.registerAdapter(require('admin-bro-mongoose'));
 
 
 app.use(express.static("public"));
-app.use(bodyParser.urlencoded({extended:true}));
+app.use(bodyParser.json());
+//app.use(bodyParser.urlencoded({extended:true}));
 //app.use(formidableMiddleware());
 app.engine('handlebars', exphbs());
 app.set('view engine', 'handlebars');
@@ -233,23 +234,21 @@ const adminBro = new AdminBro({
   databases: [mongoose],
   rootPath: '/admin',
 });
- const router = AdminBroExpress.buildRouter(adminBro);
- app.use(adminBro.options.rootPath, router);
-// const ADMIN = {
-//   email:"admin@gmail.com",
-//   password:"sanjay",
-// }
-// const router = AdminBroExpress.buildAuthenticatedRouter(adminBro,{
-//   authenticate: async (email, password)=>{
-//     if(email === ADMIN.email && password === ADMIN.password){
-//       return ADMIN
-//     }
-//     return null
-//   },
-//   cookieName: 'adminbro',
-//   cookiePassword: 'somePassword',
-// });
-// app.use(adminBro.options.rootPath, router);
+const ADMIN = {
+  email:"admin@gmail.com",
+  password:"sanjay",
+}
+const router = AdminBroExpress.buildAuthenticatedRouter(adminBro,{
+  authenticate: async (email, password)=>{
+    if(email === ADMIN.email && password === ADMIN.password){
+      return ADMIN
+    }
+    return null
+  },
+  cookieName: 'adminbro',
+  cookiePassword: 'somePassword',
+});
+app.use(adminBro.options.rootPath, router);
 
 // forgot password
 
