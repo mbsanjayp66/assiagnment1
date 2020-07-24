@@ -15,7 +15,8 @@ const async = require("async");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cookieParser = require('cookie-parser');
-const timestamps = require('mongoose-timestamp');
+const cors = require('cors');
+//const timestamps = require('mongoose-timestamp');
 // const adminRouter = require("./src/routers/admin.router");
 
 const AdminBro = require('admin-bro');
@@ -41,6 +42,7 @@ app.use(session({
  app.use(passport.session());
  app.use(cookieParser());
  app.use(flash());
+ app.use(cors())
  // app.use("/admin",adminRouter);
 
 app.get("/",function(req,res){
@@ -67,6 +69,13 @@ app.get("/logout",function(req,res){
 mongoose.connect('mongodb://localhost:27017/registerDB', {useNewUrlParser: true, useUnifiedTopology: true});
 mongoose.set('useCreateIndex', true);
 
+
+const loginSchema = new mongoose.Schema({
+logintime:String,
+logouttime:String,
+});
+const Login = new mongoose.model("Login",loginSchema);
+
 const userSchema = new mongoose.Schema({
   name:String,
   phoneNumber:Number,
@@ -79,8 +88,10 @@ const userSchema = new mongoose.Schema({
   password:String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  timeSchedule:[loginSchema],
 });
-userSchema.plugin(timestamps);
+
+//userSchema.plugin(timestamps);
 userSchema.plugin(passportLocalMongoose);
 const User = new mongoose.model("User",userSchema);
 
@@ -113,6 +124,10 @@ app.use(bodyParser.urlencoded({extended:true}));
 
 
 app.post("/register",function(req,res){
+  const login = new Login({
+    logintime:new Date(),
+  });
+  login.save();
   var newUser = new User({
     name:req.body.fname,
     phoneNumber:req.body.mobile,
@@ -122,15 +137,16 @@ app.post("/register",function(req,res){
     state: req.body.state,
     country:req.body.country,
     username:req.body.username,
-    password:req.body.password
-      });
+    password:req.body.password,
+    timeSchedule:login,
+  });
   User.register(newUser,req.body.password,function(err,user){
       if(err){
         console.log(err);
         res.redirect("/register");
       }else{
         passport.authenticate("local")(req,res,function(){
-          res.render("succes",{Time:user.createdAt});
+          res.render("succes");
         });
       }
     });
@@ -201,19 +217,27 @@ app.post("/login",function(req,res){
     username:req.body.username,
     password:req.body.password
   });
-
 req.login(user,function(err){
   if(err){
     console.log(err);
   }else{
-    passport.authenticate("local")(req,res,function(err,foundUser){
-         var time = new Date();
-          res.render("succes",{Time:time});
+    passport.authenticate("local")(req,res,function(err){
+      if(err){
+        console.log(err);
+      }else{
+        const login = new Login({
+          logintime:new Date(),
+        });
+            login.save();
+            user.timeSchedule.push(login);
+            user.save();
+            console.log(user);
+            res.render("succes");
+      }
     });
   }
 });
-
- });
+});
 
 // app.post("/logout",function(req,res){
 //     const mail = req.body.username;
@@ -236,16 +260,27 @@ req.login(user,function(err){
 
 app.post("/logout",function(req,res){
     const mail = req.body.username;
-    User.findOne({UserName:mail},function(err,foundUser){
+    User.findOne({username:mail},function(err,foundUser){
       if(err){
         console.log(err);
       }else{
         if(foundUser){
-          const startingTime = foundUser.createdAt.getTime()/1000;
-          const presentTime = Math.round(new Date().getTime()/1000);
-          const totalTime = Math.round(((presentTime-startingTime)/(60*60))*100)/100;
-            req.logout();
-          res.render("successfullylogout",{Time:totalTime});
+          console.log("sanjay");
+          const length = foundUser.timeSchedule.length-1;
+          const logtime = foundUser.timeSchedule[length].logintime;
+          const newlogin = new Login({
+            logintime:logtime,
+            logouttime:new Date()
+          });
+          newlogin.save();
+          User.updateOne({username:mail},{timeSchedule: newlogin},function(err){
+            if(err){
+              console.log(err);
+            }else{
+              req.logout();
+              res.render("successfullylogout");
+            }
+        });
         }else{
           res.render("failure");
         }
