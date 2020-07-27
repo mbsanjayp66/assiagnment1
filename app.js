@@ -225,11 +225,11 @@ req.login(user,function(err){
       if(err){
         console.log(err);
       }else{
-        const login = new Login({
+        const lo = new Login({
           logintime:new Date(),
         });
-            login.save();
-            user.timeSchedule.push(login);
+            lo.save();
+            user.timeSchedule.push(lo);
             user.save();
             console.log(user);
             res.render("succes");
@@ -265,7 +265,6 @@ app.post("/logout",function(req,res){
         console.log(err);
       }else{
         if(foundUser){
-          console.log("sanjay");
           const length = foundUser.timeSchedule.length-1;
           const logtime = foundUser.timeSchedule[length].logintime;
           const newlogin = new Login({
