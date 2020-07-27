@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 //const formidableMiddleware = require('express-formidable');
+const concat = require('concat');
 const exphbs  = require('express-handlebars');
 const path = require("path");
 const bodyParser = require("body-parser");
@@ -222,18 +223,32 @@ req.login(user,function(err){
     console.log(err);
   }else{
     passport.authenticate("local")(req,res,function(err){
-      if(err){
-        console.log(err);
-      }else{
-        const lo = new Login({
-          logintime:new Date(),
-        });
-            lo.save();
-            user.timeSchedule.push(lo);
-            user.save();
-            console.log(user);
-            res.render("succes");
-      }
+        if(req.isAuthenticated()){
+          const lo = new Login({
+            logintime:new Date(),
+          });
+          lo.save();
+          var ar = [];
+          User.findOne({username:req.body.username},function(err,us){
+            if(err){
+              console.log(err);
+            }else{
+              ar = ar.concat(us.timeSchedule);
+              ar.push(lo);
+              console.log(ar);
+              User.updateOne({username:req.body.username},{timeSchedule: ar},function(err,foundUser){
+                if(err){
+                  console.log(err);
+                }else{
+                  res.render("succes");
+                }
+            });
+            }
+          });
+        }
+        else{
+          res.redirect("login");
+        }
     });
   }
 });
@@ -265,14 +280,18 @@ app.post("/logout",function(req,res){
         console.log(err);
       }else{
         if(foundUser){
+          var sr = [];
+          sr = sr.concat(foundUser.timeSchedule);
           const length = foundUser.timeSchedule.length-1;
+          sr.pop();
           const logtime = foundUser.timeSchedule[length].logintime;
           const newlogin = new Login({
             logintime:logtime,
             logouttime:new Date()
           });
           newlogin.save();
-          User.updateOne({username:mail},{timeSchedule: newlogin},function(err){
+          sr.push(newlogin);
+          User.updateOne({username:mail},{timeSchedule: sr},function(err){
             if(err){
               console.log(err);
             }else{
