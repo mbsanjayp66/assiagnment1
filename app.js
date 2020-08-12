@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const mongoXlsx = require('mongo-xlsx');
 //const formidableMiddleware = require('express-formidable');
 const concat = require('concat');
 const exphbs  = require('express-handlebars');
@@ -17,6 +18,7 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+
 //const timestamps = require('mongoose-timestamp');
 // const adminRouter = require("./src/routers/admin.router");
 
@@ -66,18 +68,33 @@ app.get("/login",function(req,res){
 app.get("/logout",function(req,res){
   res.render("logout");
 });
-
 mongoose.connect('mongodb://localhost:27017/registerDB', {useNewUrlParser: true, useUnifiedTopology: true});
 mongoose.set('useCreateIndex', true);
 
 
-const loginSchema = new mongoose.Schema({
-logintime:String,
-logouttime:String,
-});
-const Login = new mongoose.model("Login",loginSchema);
-
-const userSchema = new mongoose.Schema({
+// const loginSchema = new mongoose.Schema({
+// logintime:String,
+// logouttime:String,
+// });
+// const Login = new mongoose.model("Login",loginSchema);
+//
+// const totalSchema = new mongoose.Schema({
+//   loginDate:String,
+//   loginTime:String,
+//   logoutTime:String,
+//   workingTime:String
+// });
+//
+// const Total = new mongoose.model("Total",totalSchema);
+//
+// const workingSchema = new mongoose.Schema({
+//   name:String,
+//   registerData:[totalSchema],
+// })
+// const Work = new mongoose.model("Work",workingSchema);
+const Schema = mongoose.Schema;
+const userSchema = Schema({
+  _id: Schema.Types.ObjectId,
   name:String,
   phoneNumber:Number,
   address:String,
@@ -89,12 +106,20 @@ const userSchema = new mongoose.Schema({
   password:String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
-  timeSchedule:[loginSchema],
+  verification:{type: Schema.Types.ObjectId, ref: "Work" }
 });
-
 //userSchema.plugin(timestamps);
 userSchema.plugin(passportLocalMongoose);
 const User = new mongoose.model("User",userSchema);
+
+const workingSchema = Schema({
+   author: { type: Schema.Types.ObjectId, ref: "User" },
+   loginDate:String,
+   loginTime:String,
+   logoutTime:String,
+   workingTime:Number,
+});
+const Work = new mongoose.model("Work",workingSchema);
 
 passport.use(User.createStrategy());
 passport.serializeUser(User.serializeUser());
@@ -103,8 +128,78 @@ passport.deserializeUser(User.deserializeUser());
 
 const adminBro = new AdminBro({
   databases: [mongoose],
+  resources:[{
+    resource:User,
+    options:{
+      properties:{
+        _id:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+      verification:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+      salt:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+        hash:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+        resetPasswordToken:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+      resetPasswordExpires:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+      },
+    },
+  },
+    {
+    resource:Work,
+    options:{
+      properties:{
+        _id:{
+          isVisible:{
+            list: false, filter: false, show: false, edit: false
+          },
+        },
+      },
+      actions:{
+        // example of overriding existing 'new' action for
+        // User resource
+        new: {
+          icon: "fas fa-cogs"
+        },
+        // Example of creating a new 'myNewAction' which will be
+        // a resource action available for User model
+        myNewAction: {
+          actionType: '/',
+        handler: async (req, res, context) => {
+          res:"./excel"
+        },
+      },
+    },
+    },
+  }],
   rootPath: '/admin',
+  branding: {
+    companyName:"flaberry"
+  }
 });
+const { ACTIONS } = require('admin-bro')
+// example of adding after filter for 'show' action for all resources
+ACTIONS.show.after = async () => {console.log("working");}
 const ADMIN = {
   email:"admin@gmail.com",
   password:"sanjay",
@@ -125,11 +220,12 @@ app.use(bodyParser.urlencoded({extended:true}));
 
 
 app.post("/register",function(req,res){
-  const login = new Login({
-    logintime:new Date(),
-  });
-  login.save();
-  var newUser = new User({
+  // const login = new Login({
+  //   logintime:new Date(),
+  // });
+  // login.save();
+  const newUser = new User({
+    _id:new mongoose.Types.ObjectId(),
     name:req.body.fname,
     phoneNumber:req.body.mobile,
     address:req.body.address,
@@ -139,14 +235,25 @@ app.post("/register",function(req,res){
     country:req.body.country,
     username:req.body.username,
     password:req.body.password,
-    timeSchedule:login,
   });
+  //newUser.save();
+  const working = new Work({
+     author:newUser._id,
+     loginDate:new Date().toJSON().slice(0,10),
+     loginTime:new Date()
+  });
+  working.save();
   User.register(newUser,req.body.password,function(err,user){
       if(err){
         console.log(err);
         res.redirect("/register");
       }else{
         passport.authenticate("local")(req,res,function(){
+          User.updateOne({password:user.password},{verification:working.id},function(err,r){
+            if(err){
+              console.log(err);
+            }
+          });
           res.render("succes");
         });
       }
@@ -214,34 +321,34 @@ app.post("/register",function(req,res){
 
 app.post("/login",function(req,res){
 
-  const user = new User({
+  const use = new User({
     username:req.body.username,
     password:req.body.password
   });
-req.login(user,function(err){
+ req.login(use,function(err){
   if(err){
     console.log(err);
   }else{
     passport.authenticate("local")(req,res,function(err){
         if(req.isAuthenticated()){
-          const lo = new Login({
-            logintime:new Date(),
-          });
-          lo.save();
-          var ar = [];
-          User.findOne({username:req.body.username},function(err,us){
+          User.findOne({username:req.body.username},function(err,user){
             if(err){
               console.log(err);
             }else{
-              ar = ar.concat(us.timeSchedule);
-              ar.push(lo);
-              console.log(ar);
-              User.updateOne({username:req.body.username},{timeSchedule: ar},function(err,foundUser){
-                if(err){
-                  console.log(err);
-                }else{
-                  res.render("succes");
-                }
+            Work.findOne({author:user._id},function(err,work){
+              if(!err){
+                const newWork = new Work({
+                  author:user._id,
+                  loginDate:new Date().toJSON().slice(0,10),
+                  loginTime:new Date()
+                });
+                newWork.save();
+                User.updateOne({username:req.body.username},{verification:newWork.id},function(err){
+                  if(!err){
+                    res.render("succes");
+                  }
+                });
+              }
             });
             }
           });
@@ -275,38 +382,134 @@ req.login(user,function(err){
 
 app.post("/logout",function(req,res){
     const mail = req.body.username;
-    User.findOne({username:mail},function(err,foundUser){
-      if(err){
-        console.log(err);
-      }else{
-        if(foundUser){
-          var sr = [];
-          sr = sr.concat(foundUser.timeSchedule);
-          const length = foundUser.timeSchedule.length-1;
-          sr.pop();
-          const logtime = foundUser.timeSchedule[length].logintime;
-          const newlogin = new Login({
-            logintime:logtime,
-            logouttime:new Date()
-          });
-          newlogin.save();
-          sr.push(newlogin);
-          User.updateOne({username:mail},{timeSchedule: sr},function(err){
-            if(err){
-              console.log(err);
-            }else{
-              req.logout();
-              res.render("successfullylogout");
-            }
-        });
-        }else{
-          res.render("failure");
-        }
-      }
+    User.findOne({username:mail},function(err,user){
+     Work.findOne({author:user._id},function(err,workerFound){
+       if(!err){
+         Work.updateOne({_id:user.verification},{logoutTime:new Date()},function(err,workFound){
+           if(err){
+             console.log(err);
+           }
+         });
+         Work.findOne({_id:user.verification},function(err,work){
+           if(!err){
+             const startTime = (new Date(work.loginTime).getTime()/1000);
+             const endTime =(new Date(work.logoutTime).getTime()/1000);
+             const time = Math.round(((endTime-startTime)/(60))*100)/100;
+             Work.updateOne({_id:user.verification},{workingTime:time},function(err,found){
+               if(err){
+                 console.log(err);
+               }else{
+                 req.logout();
+                res.render("successfullylogout");
+               }
+             })
+           }
+         })
+       }
+     });
     });
-});
+  });
+    // User.findOne({username:mail},function(err,foundUser){
+    //   if(err){
+    //     console.log(err);
+    //   }else{
+    //     if(foundUser){
+    //       var sr = [];
+    //       sr = sr.concat(foundUser.timeSchedule);
+    //       const length = foundUser.timeSchedule.length-1;
+    //       sr.pop();
+    //       const logtime = foundUser.timeSchedule[length].logintime;
+    //       const newlogin = new Login({
+    //         logintime:logtime,
+    //         logouttime:new Date()
+    //       });
+    //       newlogin.save();
+    //       sr.push(newlogin);
+    //
+    //       const startTime = (new Date(logtime)/1000);
+    //       const endTime = (new Date().getTime()/1000);
+    //       const worktime = Math.round(((endTime-startTime)/(60))*100)/100;
+    //       const total = new Total({
+    //       loginDate:new Date().toJSON().slice(0,10),
+    //        loginTime:logtime,
+    //        logoutTime:new Date(),
+    //        workingTime:worktime,
+    //      });
+    //      total.save();
+    //      if(length === 0){
+    //        const work = new Work({
+    //          name:foundUser.name,
+    //          registerData:total,
+    //        });
+    //        work.save();
+    //       var data = [ { name : work.name, Login_Date: total.loginDate, Login_time:total.loginTime, LogOut_time:total.logoutTime, Working_Hours:total.workingTime}];
+    //        var model = mongoXlsx.buildDynamicModel(data);
+    //        mongoXlsx.mongoData2Xlsx(data, model, function(err, data) {
+    //        console.log('File saved at:', data);
+    //         });
+    //      }
+    //      else{
+    //        Work.findOne({name:foundUser.name},function(err,datauser){
+    //          if(err){
+    //            console.log(err);
+    //          }else{
+    //            var wh = [];
+    //            wh = wh.concat(datauser.registerData);
+    //            wh.push(total);
+    //            Work.updateOne({name:foundUser.name},{registerData: wh},function(err){
+    //              if(err){
+    //                console.log(err);
+    //              }
+    //            });
+    //            var data_storage = [];
+    //            Work.findOne({name:foundUser.name},function(err,found){
+    //              if(!err){
+    //                const x = found.registerData;
+    //                for(var i=0;i<x.length;i++){
+    //                  var data =  { name : found.name, Login_date: x[i].loginDate, Login_time:x[i].loginTime, Logout_time:x[i].logoutTime, Working_hours:x[i].workingTime};
+    //                  data_storage.push(data);
+    //                }
+    //
+    //                var model = mongoXlsx.buildDynamicModel(data_storage);
+    //                mode = model;
+    //                /* Generate Excel */
+    //                   mongoXlsx.mongoData2Xlsx(data_storage, model, function(err, dat) {
+    //                  console.log('File saved at:', dat.fullPath);
+    //                });
+    //              }
+    //            });
+    //          }
+    //        });
+    //      }
+    //       User.updateOne({username:mail},{timeSchedule: sr},function(err){
+    //         if(err){
+    //           console.log(err);
+    //         }else{
+    //           req.logout();
+    //           res.render("successfullylogout");
+    //         }
+    //     });
+    //     }else{
+    //       res.render("failure");
+    //     }
+    //   }
+    // });
+//});
 //
+//csv
 
+// app.get('/exporttocsv', function(req, res, next) {
+//     var filename   = "products.csv";
+//     var dataArray;
+//     User.find().lean().exec({}, function(err, products) {
+//         if (err) res.send(err);
+//
+//         res.statusCode = 200;
+//         res.setHeader('Content-Type', 'text/csv');
+//         res.setHeader("Content-Disposition", 'attachment; filename='+filename);
+//         res.csv(products, true);
+//     });
+//  });
 
 // forgot password
 
